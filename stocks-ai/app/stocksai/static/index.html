@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stocks AI</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #16191d; --muted: #67707c; --line: #e3e6ea;
+    --accent: #2f6fde; --good: #1f8a4c; --bad: #c8392e; --warn: #b7791f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111418; --card: #1a1e24; --text: #e7eaee; --muted: #9aa3ae; --line: #2b3139;
+            --accent: #6b9cf0; --good: #4cc07c; --bad: #ef6b5f; --warn: #e0a84a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+  header h1 { font-size: 17px; margin: 0 auto 0 0; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .card h2 { font-size: 14px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .stat .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .l { color: var(--muted); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .scroll { overflow-x: auto; }
+  .pos { color: var(--good); } .neg { color: var(--bad); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); }
+  .pill.paper { color: var(--accent); border-color: var(--accent); }
+  .pill.live { color: #fff; background: var(--bad); border-color: var(--bad); }
+  .pill.on { color: var(--good); border-color: var(--good); }
+  .pill.off { color: var(--muted); }
+  button { font: inherit; padding: 6px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .banner { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--warn); color: var(--warn); }
+  .muted { color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 16px; }
+  label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+  label.check { display: flex; align-items: center; gap: 8px; color: var(--text); }
+  input, select, textarea { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
+  input[type=checkbox] { width: auto; }
+  textarea { min-height: 80px; resize: vertical; }
+  details { border-bottom: 1px solid var(--line); padding: 8px 0; }
+  summary { cursor: pointer; }
+  .event { margin: 6px 0 6px 12px; padding-left: 10px; border-left: 2px solid var(--line); white-space: pre-wrap; word-break: break-word; }
+  .event.tool_call { color: var(--accent); } .event.tool_result { color: var(--muted); font-size: 12px; max-height: 120px; overflow: auto; }
+  .event.error { color: var(--bad); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; display: none; max-width: calc(100% - 32px); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Stocks AI</h1>
+  <span id="acct-pill" class="pill"></span>
+  <span id="trading-pill" class="pill"></span>
+  <span id="mode-pill" class="pill"></span>
+  <button id="run-btn" class="primary">Run AI now</button>
+  <button id="kill-btn" class="danger">Stop all trading</button>
+</header>
+<main>
+  <div id="banner"></div>
+
+  <section class="card">
+    <h2>Account</h2>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card">
+    <h2>Awaiting your approval</h2>
+    <div id="pending" class="scroll"></div>
+  </section>
+
+  <section class="card">
+    <h2>Positions</h2>
+    <div id="positions" class="scroll"></div>
+  </section>
+
+  <section class="card">
+    <h2>AI runs</h2>
+    <div id="runs"></div>
+  </section>
+
+  <section class="card">
+    <h2>Proposal history</h2>
+    <div id="history" class="scroll"></div>
+  </section>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <form id="settings" class="grid2"></form>
+    <div class="row" style="margin-top:12px"><button class="primary" id="save-btn">Save settings</button></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const usd = (n) => n == null ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+const signed = (n, suffix = "") => n == null ? "—" : `<span class="${n >= 0 ? "pos" : "neg"}">${n >= 0 ? "+" : ""}${n.toFixed(2)}${suffix}</span>`;
+const when = (iso) => iso ? new Date(iso).toLocaleString() : "";
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.detail || r.statusText);
+  return body;
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 4000); }
+
+let settings = null;
+
+async function refresh() {
+  const st = await api("/api/state");
+  settings = st.settings;
+  const s = st.settings;
+  $("#acct-pill").className = "pill " + (s.alpaca_paper ? "paper" : "live");
+  $("#acct-pill").textContent = s.alpaca_paper ? "Paper account" : "LIVE MONEY";
+  $("#trading-pill").className = "pill " + (s.trading_enabled ? "on" : "off");
+  $("#trading-pill").textContent = s.trading_enabled ? "Trading on" : "Trading off";
+  $("#mode-pill").className = "pill";
+  $("#mode-pill").textContent = s.mode === "auto" ? "Auto-execute" : "Approve each trade";
+
+  const missing = [!s.anthropic_api_key && "Anthropic API key", !s.alpaca_key_id && "Alpaca key ID", !s.alpaca_secret && "Alpaca secret"].filter(Boolean);
+  $("#banner").innerHTML = [
+    missing.length ? `<div class="banner">Add your ${missing.join(", ")} in Settings below to get started.</div>` : "",
+    st.broker_error && !missing.length ? `<div class="banner">Broker: ${esc(st.broker_error)}</div>` : "",
+  ].join("");
+
+  if (st.account) {
+    const a = st.account, day = a.equity - a.last_equity;
+    $("#stats").innerHTML = [
+      ["Equity", usd(a.equity)], ["Cash", usd(a.cash)], ["Today", `${signed(day)} (${signed(a.last_equity ? day / a.last_equity * 100 : 0, "%")})`],
+      ["Market", st.clock.is_open ? "Open" : `Closed · opens ${when(st.clock.next_open)}`], ["Trades today", `${st.trades_today} / ${s.max_trades_per_day}`],
+    ].map(([l, v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
+    $("#positions").innerHTML = st.positions.length ? `<table><tr><th>Symbol</th><th>Qty</th><th>Avg cost</th><th>Price</th><th>Value</th><th>P/L</th></tr>${
+      st.positions.map((p) => `<tr><td><b>${esc(p.symbol)}</b></td><td>${p.qty}</td><td>${usd(p.avg_entry_price)}</td><td>${usd(p.current_price)}</td><td>${usd(p.market_value)}</td><td>${signed(p.unrealized_pl)} (${signed(p.unrealized_plpc, "%")})</td></tr>`).join("")}</table>` : `<p class="muted">No positions.</p>`;
+  } else {
+    $("#stats").innerHTML = `<p class="muted">Not connected to the broker.</p>`;
+    $("#positions").innerHTML = "";
+  }
+
+  $("#pending").innerHTML = st.pending.length ? `<table><tr><th>Trade</th><th>Why</th><th></th></tr>${
+    st.pending.map((p) => `<tr><td><b>${p.side.toUpperCase()} ${esc(p.symbol)}</b><br>${p.side === "buy" ? usd(p.notional_usd) : p.qty + " sh"}<br><span class="muted">${when(p.created_at)}</span></td>
+      <td>${esc(p.reason)}</td>
+      <td class="row"><button class="primary" data-approve="${p.id}">Approve</button><button data-reject="${p.id}">Reject</button></td></tr>`).join("")}</table>`
+    : `<p class="muted">Nothing waiting.</p>`;
+}
+
+async function loadRuns() {
+  const runs = await api("/api/runs");
+  $("#runs").innerHTML = runs.length ? runs.map((r) => `<details data-run="${r.id}"><summary><b>#${r.id}</b> ${when(r.started_at)} · ${esc(r.trigger)} · ${esc(r.status)}
+    <span class="muted">· ${((r.input_tokens + r.output_tokens) / 1000).toFixed(1)}k tokens</span></summary>
+    <div class="event">${esc(r.summary || "")}</div><div class="log muted">Loading…</div></details>`).join("") : `<p class="muted">No runs yet.</p>`;
+  const props = await api("/api/proposals");
+  $("#history").innerHTML = props.length ? `<table><tr><th>#</th><th>When</th><th>Trade</th><th>Status</th><th>Notes</th></tr>${
+    props.map((p) => `<tr><td>${p.id}</td><td>${when(p.created_at)}</td><td>${p.side.toUpperCase()} ${esc(p.symbol)} ${p.side === "buy" ? usd(p.notional_usd) : (p.qty ?? "") + " sh"}</td>
+      <td>${esc(p.status)}</td><td class="muted">${esc(p.risk_notes || p.reason)}</td></tr>`).join("")}</table>` : `<p class="muted">No proposals yet.</p>`;
+}
+
+document.addEventListener("toggle", async (e) => {
+  const d = e.target;
+  if (!d.dataset?.run || !d.open) return;
+  const { events } = await api(`/api/runs/${d.dataset.run}`);
+  d.querySelector(".log").innerHTML = events.map((ev) => {
+    const data = JSON.parse(ev.data);
+    const text = ev.kind === "tool_call" ? `→ ${data.name}(${JSON.stringify(data.input)})`
+      : ev.kind === "tool_result" ? `← ${data.output}` : data;
+    return `<div class="event ${ev.kind}">${esc(text)}</div>`;
+  }).join("") || "No events.";
+}, true);
+
+document.addEventListener("click", async (e) => {
+  const a = e.target.dataset.approve, r = e.target.dataset.reject;
+  if (!a && !r) return;
+  e.target.disabled = true;
+  try {
+    if (a) {
+      const res = await api(`/api/proposals/${a}/approve`, { method: "POST" });
+      toast(res.ok ? "Order submitted." : `Not executed: ${res.error}`);
+    } else {
+      await api(`/api/proposals/${r}/reject`, { method: "POST" });
+      toast("Rejected.");
+    }
+  } catch (err) { toast(err.message); }
+  refresh(); loadRuns();
+});
+
+$("#run-btn").onclick = async () => {
+  try { await api("/api/run", { method: "POST" }); toast("AI run started. It usually takes a minute or two."); setTimeout(loadRuns, 1500); }
+  catch (err) { toast(err.message); }
+};
+$("#kill-btn").onclick = async () => {
+  await api("/api/kill", { method: "POST" }); toast("Trading and schedule turned off."); refresh(); renderSettings();
+};
+
+const FIELDS = [
+  ["anthropic_api_key", "Anthropic API key", "secret"], ["alpaca_key_id", "Alpaca key ID", "secret"], ["alpaca_secret", "Alpaca secret", "secret"],
+  ["alpaca_paper", "Paper trading account (uncheck only for real money)", "check"],
+  ["trading_enabled", "Trading on (master switch: nothing executes while off)", "check"],
+  ["mode", "Mode", "select", [["approve", "Approve each trade"], ["auto", "Auto-execute within limits"]]],
+  ["schedule_enabled", "Run on a schedule during market hours", "check"],
+  ["interval_minutes", "Minutes between scheduled runs", "number"],
+  ["model", "Claude model", "select", [["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-4-5", "Claude Haiku 4.5"]]],
+  ["effort", "Thinking effort", "select", [["low", "Low"], ["medium", "Medium"], ["high", "High"], ["xhigh", "Extra high"]]],
+  ["watchlist", "Watchlist (comma separated)", "list"],
+  ["restrict_to_watchlist", "Only trade watchlist symbols", "check"],
+  ["max_order_usd", "Max order size ($)", "number"], ["max_position_pct", "Max position (% of equity)", "number"],
+  ["min_cash_pct", "Cash reserve (% of equity)", "number"], ["max_trades_per_day", "Max trades per day", "number"],
+  ["max_daily_loss_pct", "Pause buys after daily loss of (%)", "number"],
+  ["strategy", "Investment strategy (plain English, given to the AI)", "text"],
+];
+
+function renderSettings() {
+  const s = settings;
+  $("#settings").innerHTML = FIELDS.map(([k, label, type, opts]) => {
+    if (type === "check") return `<label class="check"><input type="checkbox" name="${k}" ${s[k] ? "checked" : ""}> ${label}</label>`;
+    if (type === "secret") return `<label>${label}<input type="password" name="${k}" autocomplete="off" placeholder="${s[k] ? "Saved. Leave blank to keep" : "Not set"}"></label>`;
+    if (type === "select") return `<label>${label}<select name="${k}">${opts.map(([v, t]) => `<option value="${v}" ${s[k] === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>`;
+    if (type === "text") return `<label style="grid-column:1/-1">${label}<textarea name="${k}">${esc(s[k])}</textarea></label>`;
+    if (type === "list") return `<label style="grid-column:1/-1">${label}<input name="${k}" value="${esc(s[k].join(", "))}"></label>`;
+    return `<label>${label}<input type="number" step="any" name="${k}" value="${s[k]}"></label>`;
+  }).join("");
+}
+
+$("#save-btn").onclick = async () => {
+  const f = $("#settings"), out = {};
+  for (const [k, , type] of FIELDS) {
+    const el = f.elements[k];
+    if (type === "check") out[k] = el.checked;
+    else if (type === "number") out[k] = Number(el.value);
+    else if (type === "list") out[k] = el.value.split(",");
+    else out[k] = el.value;
+  }
+  if (!out.alpaca_paper && settings.alpaca_paper && !confirm("Switch to a LIVE account? Real money will be traded once trading is on.")) return;
+  if (out.mode === "auto" && settings.mode !== "auto" && !confirm("In auto mode the AI's trades execute without your approval (within the risk limits). Continue?")) return;
+  try { await api("/api/settings", { method: "POST", body: JSON.stringify(out) }); toast("Saved."); }
+  catch (err) { toast(err.message); }
+  await refresh(); renderSettings();
+};
+
+(async () => {
+  try { await refresh(); renderSettings(); await loadRuns(); } catch (err) { toast(err.message); }
+  setInterval(() => { refresh().catch(() => {}); }, 30000);
+  setInterval(() => { if (!document.querySelector("#runs details[open]")) loadRuns().catch(() => {}); }, 15000);
+})();
+</script>
+</body>
+</html>
