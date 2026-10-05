@@ -1,17 +1,7 @@
-# Umbrel apps
+# Stocks AI: source
 
-A community app store for Umbrel.
+Source code for the **Stocks AI** Umbrel app. The app is installed from the community store
+https://github.com/Urmomnumber1/hermes-umbrel-store
 
-## Add to Umbrel
-
-App Store → ⋯ (top right) → **Community App Stores** → paste:
-
-```
-https://github.com/Urmomnumber1/umbrel-apps
-```
-
-## Apps
-
-- **Stocks AI** (`anjalo-stocks-ai/`): an AI portfolio assistant using Claude + Alpaca, with hard risk limits and per-trade approval. Source and docs are in [`stocks-ai/`](stocks-ai/README.md).
-
-The Docker image is built for amd64 and arm64 by GitHub Actions and published to `ghcr.io/urmomnumber1/stocks-ai`.
+- App code, risk rules and docs: [`stocks-ai/`](stocks-ai/README.md)
+- GitHub Actions builds the Docker image (amd64 + arm64) on every change under `stocks-ai/app/` and publishes it to `ghcr.io/urmomnumber1/stocks-ai`.

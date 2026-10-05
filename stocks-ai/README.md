@@ -47,7 +47,7 @@ cd app
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/YOUR_GITHUB_USER/stocks-ai:0.1.0 --push .
 ```
 
-Then (already done in this repo):
+Then (already done: the app is listed in https://github.com/Urmomnumber1/hermes-umbrel-store):
 
 1. Put `umbrel-store/` in its own GitHub repo, which becomes your community app store.
 2. In `umbrel-store/anjalo-stocks-ai/docker-compose.yml`, set `image:` to the image you pushed.
